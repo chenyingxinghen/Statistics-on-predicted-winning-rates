@@ -83,8 +83,14 @@ dependencies {
     implementation 'com.squareup.okhttp3:okhttp:4.11.0'
     implementation 'com.squareup.okhttp3:logging-interceptor:4.11.0'
     
-    // 添加Markdown渲染库
-    implementation 'com.github.jeziellago:compose-markdown:0.5.0'
+    // 添加OkHttp SSE支持
+    implementation 'com.squareup.okhttp3:okhttp-sse:4.11.0'
+    
+    // 添加Markdown渲染库（更新到最新版本）
+    implementation 'com.github.jeziellago:compose-markdown:0.5.7'
+    
+    // 添加 Gson 依赖以解决 `JsonParser.parseString` 的未解析引用问题
+    implementation 'com.google.code.gson:gson:2.8.9'
     
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'

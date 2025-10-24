@@ -5,27 +5,44 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.predictapp.data.model.NewsAnalysisResult
-import com.predictapp.data.service.NewsAnalysisService
+import com.predictapp.ui.viewmodel.NewsAnalysisViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import dev.jeziellago.compose.markdowntext.MarkdownText
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewsAnalysisScreen(navController: NavController) {
-    var isLoading by remember { mutableStateOf(false) }
-    var analysisResult by remember { mutableStateOf<NewsAnalysisResult?>(null) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    // 使用ViewModel而不是直接创建Service
+    val viewModel: NewsAnalysisViewModel = viewModel()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val analysisResult by viewModel.analysisResult.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    val streamResult by viewModel.streamResult.collectAsState()
+    
     val coroutineScope = rememberCoroutineScope()
-    val newsService = remember { NewsAnalysisService() }
+
+    // 定义Markdown文本样式
+    val markdownStyle = MaterialTheme.typography.bodyMedium.copy(
+        lineHeight = 24.sp,
+        fontSize = 16.sp,
+        textAlign = TextAlign.Start // 改为Start对齐以更好地支持Markdown格式
+    )
 
     Column(
         modifier = Modifier
@@ -39,7 +56,7 @@ fun NewsAnalysisScreen(navController: NavController) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = { navController.popBackStack() }) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
             }
             Text(
                 "新闻分析与预测",
@@ -53,27 +70,7 @@ fun NewsAnalysisScreen(navController: NavController) {
         // 分析按钮
         Button(
             onClick = {
-                isLoading = true
-                errorMessage = null
-                analysisResult = null
-                
-                coroutineScope.launch {
-                    try {
-                        // 调用网络请求获取新闻分析结果
-                        val result = newsService.getNewsAnalysis()
-                        
-                        if (result.success) {
-                            analysisResult = result
-                        } else {
-                            errorMessage = result.message ?: "未知错误"
-                        }
-                        isLoading = false
-                    } catch (e: Exception) {
-                        Log.e("NewsAnalysis", "获取分析结果失败", e)
-                        errorMessage = "获取分析结果失败: ${e.message}"
-                        isLoading = false
-                    }
-                }
+                viewModel.getNewsAnalysisStream()
             },
             modifier = Modifier.fillMaxWidth(),
             enabled = !isLoading
@@ -112,26 +109,170 @@ fun NewsAnalysisScreen(navController: NavController) {
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // 显示分析结果
+        // 实时显示流式结果
+        // 只有在加载中且有流式结果显示时才显示这个区域
+        if (isLoading && streamResult.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "实时分析中...",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // 改进Markdown渲染样式，增强对粗体、标题等的支持
+                    MarkdownText(
+                        markdown = streamResult,
+                        modifier = Modifier.fillMaxWidth(),
+                        style = markdownStyle,
+                        onLinkClicked = { _ -> 
+                            // 可选：处理链接点击事件
+                        }
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        
+        // 显示最终分析结果
         analysisResult?.let { result ->
             if (result.success) {
+                // 摘要部分
+                if (result.summary.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                "摘要",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            MarkdownText(
+                                markdown = result.summary,
+                                modifier = Modifier.fillMaxWidth(),
+                                style = markdownStyle,
+                                onLinkClicked = { _ -> }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+                
+                // 行业分析部分
+                if (result.industryAnalysis.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                "行业分析",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            MarkdownText(
+                                markdown = result.industryAnalysis,
+                                modifier = Modifier.fillMaxWidth(),
+                                style = markdownStyle,
+                                onLinkClicked = { _ -> }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+                
+                // 市场趋势部分
+                if (result.marketTrend.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                "市场趋势",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            MarkdownText(
+                                markdown = result.marketTrend,
+                                modifier = Modifier.fillMaxWidth(),
+                                style = markdownStyle,
+                                onLinkClicked = { _ -> }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+                
                 // 预测结果（使用Markdown渲染）
                 Card(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            "分析结果",
+                            "详细分析",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        // 使用MarkdownText组件渲染LLM的原始响应
+                        // 改进Markdown渲染样式，增强对粗体、标题等的支持
                         MarkdownText(
                             markdown = result.prediction,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            style = markdownStyle,
+                            onLinkClicked = { _ -> 
+                                // 可选：处理链接点击事件
+                            }
                         )
                     }
+                }
+            } else {
+                // 显示错误信息
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "分析失败",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = result.message ?: "未知错误",
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
+        }
+        
+        // 当加载完成但没有analysisResult时显示已完成状态
+        if (!isLoading && analysisResult == null && streamResult.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "分析已完成",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // 改进Markdown渲染样式，增强对粗体、标题等的支持
+                    MarkdownText(
+                        markdown = streamResult,
+                        modifier = Modifier.fillMaxWidth(),
+                        style = markdownStyle,
+                        onLinkClicked = { _ -> 
+                            // 可选：处理链接点击事件
+                        }
+                    )
                 }
             }
         }
