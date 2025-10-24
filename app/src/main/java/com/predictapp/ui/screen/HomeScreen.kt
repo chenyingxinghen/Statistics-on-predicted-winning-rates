@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
@@ -20,7 +21,10 @@ import com.predictapp.ui.viewmodel.IndustryViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(viewModel: IndustryViewModel = viewModel()) {
+fun HomeScreen(
+    viewModel: IndustryViewModel = viewModel(),
+    navController: NavController? = null
+) {
     val industries by viewModel.allIndustries.collectAsState(initial = emptyList())
     var showAddDialog by remember { mutableStateOf(false) }
     var industryToEdit by remember { mutableStateOf<Industry?>(null) }
@@ -37,6 +41,23 @@ fun HomeScreen(viewModel: IndustryViewModel = viewModel()) {
             Text("行业管理", style = MaterialTheme.typography.headlineMedium)
             FloatingActionButton(onClick = { showAddDialog = true }) {
                 Icon(Icons.Default.Add, contentDescription = "添加行业")
+            }
+        }
+
+        // 功能按钮区域
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Button(
+                onClick = { navController?.navigate("news_analysis") },
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.Analytics, contentDescription = "新闻分析")
+                Spacer(Modifier.width(8.dp))
+                Text("新闻分析")
             }
         }
 

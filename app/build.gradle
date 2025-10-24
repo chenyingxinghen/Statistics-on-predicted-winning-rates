@@ -52,8 +52,6 @@ android {
     }
 }
 
-
-
 dependencies {
     implementation 'androidx.core:core-ktx:1.10.1'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.1'
@@ -78,6 +76,15 @@ dependencies {
     
     // Navigation
     implementation "androidx.navigation:navigation-compose:2.7.1"
+    
+    // 网络请求依赖
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    implementation 'com.squareup.okhttp3:okhttp:4.11.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.11.0'
+    
+    // 添加Markdown渲染库
+    implementation 'com.github.jeziellago:compose-markdown:0.5.0'
     
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
