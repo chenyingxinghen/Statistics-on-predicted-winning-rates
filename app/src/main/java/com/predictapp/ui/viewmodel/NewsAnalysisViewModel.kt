@@ -11,6 +11,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+// 新增：流式分析状态数据类
+data class StreamAnalysisState(
+    val reasoning: String = "",
+    val content: String = ""
+)
+
 class NewsAnalysisViewModel : ViewModel() {
     private val newsService = NewsAnalysisService()
 
@@ -22,9 +28,9 @@ class NewsAnalysisViewModel : ViewModel() {
     private val _analysisResult = MutableStateFlow<NewsAnalysisResult?>(null)
     val analysisResult: StateFlow<NewsAnalysisResult?> = _analysisResult.asStateFlow()
 
-    // 流式结果
-    private val _streamResult = MutableStateFlow("")
-    val streamResult: StateFlow<String> = _streamResult.asStateFlow()
+    // 流式结果（结构化）
+    private val _streamResult = MutableStateFlow(StreamAnalysisState())
+    val streamResult: StateFlow<StreamAnalysisState> = _streamResult.asStateFlow()
 
     // 错误消息
     private val _errorMessage = MutableStateFlow<String?>(null)
@@ -39,50 +45,38 @@ class NewsAnalysisViewModel : ViewModel() {
             _isLoading.value = true
             _errorMessage.value = null
             _analysisResult.value = null
-            _streamResult.value = "" // 清空流式结果
+            _streamResult.value = StreamAnalysisState() // 清空流式结果
 
             try {
-                // 调用网络请求获取新闻分析结果（流式）
                 val stream = newsService.getNewsAnalysisStream()
 
                 stream.collect { data ->
                     try {
                         Log.d("NewsAnalysisViewModel", "Received data chunk: $data")
-                        // 判断是否为 JSON 对象
                         val trimmed = data.trim()
                         if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
-                            val jsonElement = JsonParser.parseString(data)
-                            if (jsonElement.isJsonObject) {
+                            val jsonElement = try { JsonParser.parseString(data) } catch (e: Exception) { null }
+                            if (jsonElement != null && jsonElement.isJsonObject) {
                                 val jsonObject = jsonElement.asJsonObject
                                 if (jsonObject.has("error")) {
-                                    _errorMessage.value = jsonObject.get("error").asString
+                                    _errorMessage.value = jsonObject.get("error")?.asString ?: "未知错误"
                                     _isLoading.value = false
                                 } else {
-                                    // 支持 reasoning_content 和 content
-                                    val reasoning = jsonObject.get("reasoning_content")?.asString
-                                    val content = jsonObject.get("content")?.asString
-                                    val sb = StringBuilder()
-                                    if (!reasoning.isNullOrBlank()) {
-                                        sb.append(reasoning)
-                                        if (!content.isNullOrBlank()) sb.append("\n")
-                                    }
-                                    if (!content.isNullOrBlank()) {
-                                        sb.append(content)
-                                    }
-                                    val merged = sb.toString()
-                                    if (merged.isNotBlank()) {
-                                        _streamResult.value += merged
-                                        _streamResult.value = StringBuilder(_streamResult.value).toString()
-                                        Log.d("NewsAnalysisViewModel", "Stream result updated, length: ${_streamResult.value.length}")
-                                    }
+                                    // 兼容后端输出的reasoning和content，健壮性处理
+                                    val reasoning = if (jsonObject.has("reasoning")) jsonObject.get("reasoning")?.asString else null
+                                    val content = if (jsonObject.has("content")) jsonObject.get("content")?.asString else null
+                                    val prev = _streamResult.value
+                                    _streamResult.value = StreamAnalysisState(
+                                        reasoning = prev.reasoning + (reasoning ?: ""),
+                                        content = prev.content + (content ?: "")
+                                    )
+                                    Log.d("NewsAnalysisViewModel", "Stream reasoning: ${_streamResult.value.reasoning.length}, content: ${_streamResult.value.content.length}")
                                 }
-                            } else {
-                                // 不是 JSON 对象，直接拼接原始内容
-                                _streamResult.value += data
-                            }
+                            } // 不是JSON对象直接跳过
                         } else {
-                            // 非 JSON 内容直接拼接
-                            _streamResult.value += data
+                            // 非 JSON 内容直接拼接到content
+                            val prev = _streamResult.value
+                            _streamResult.value = prev.copy(content = prev.content + data)
                         }
                     } catch (e: Exception) {
                         Log.e("NewsAnalysisViewModel", "Error processing data chunk", e)
@@ -94,7 +88,7 @@ class NewsAnalysisViewModel : ViewModel() {
                 // 只有在没有错误的情况下才设置最终结果
                 if (_errorMessage.value == null) {
                     _analysisResult.value = NewsAnalysisResult(
-                        prediction = _streamResult.value,
+                        prediction = _streamResult.value.content,
                         success = true
                     )
                 }
@@ -102,7 +96,6 @@ class NewsAnalysisViewModel : ViewModel() {
                 Log.e("NewsAnalysisViewModel", "Error getting stream analysis", e)
                 _errorMessage.value = "获取分析结果失败: ${e.message}"
             } finally {
-                // 确保在任何情况下都设置isLoading为false
                 Log.d("NewsAnalysisViewModel", "Stream analysis completed, setting loading to false")
                 _isLoading.value = false
             }
@@ -122,7 +115,7 @@ class NewsAnalysisViewModel : ViewModel() {
     fun reset() {
         _isLoading.value = false
         _analysisResult.value = null
-        _streamResult.value = ""
+        _streamResult.value = StreamAnalysisState()
         _errorMessage.value = null
     }
 }

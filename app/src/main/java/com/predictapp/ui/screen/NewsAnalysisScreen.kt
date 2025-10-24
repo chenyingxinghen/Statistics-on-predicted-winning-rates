@@ -34,8 +34,16 @@ fun NewsAnalysisScreen(navController: NavController) {
     val analysisResult by viewModel.analysisResult.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val streamResult by viewModel.streamResult.collectAsState()
-    
-    val coroutineScope = rememberCoroutineScope()
+
+    // 新增：reasoning折叠状态
+    var isReasoningCollapsed by remember { mutableStateOf(false) }
+
+    // 监听推理完成自动折叠（isLoading变为false且reasoning有内容时）
+    LaunchedEffect(isLoading, streamResult.reasoning) {
+        if (!isLoading && streamResult.reasoning.isNotBlank()) {
+            isReasoningCollapsed = true
+        }
+    }
 
     // 定义Markdown文本样式
     val markdownStyle = MaterialTheme.typography.bodyMedium.copy(
@@ -109,9 +117,8 @@ fun NewsAnalysisScreen(navController: NavController) {
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // 实时显示流式结果
-        // 只有在加载中且有流式结果显示时才显示这个区域
-        if (isLoading && streamResult.isNotEmpty()) {
+        // 实时显示流式结果（分区显示reasoning和content）
+        if (isLoading && (streamResult.reasoning.isNotBlank() || streamResult.content.isNotBlank())) {
             Card(
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -122,15 +129,43 @@ fun NewsAnalysisScreen(navController: NavController) {
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    // 改进Markdown渲染样式，增强对粗体、标题等的支持
-                    MarkdownText(
-                        markdown = streamResult,
-                        modifier = Modifier.fillMaxWidth(),
-                        style = markdownStyle,
-                        onLinkClicked = { _ -> 
-                            // 可选：处理链接点击事件
+                    // Reasoning部分（可折叠）
+                    if (streamResult.reasoning.isNotBlank()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "推理过程",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            TextButton(onClick = { isReasoningCollapsed = !isReasoningCollapsed }) {
+                                Text(if (isReasoningCollapsed) "展开" else "折叠")
+                            }
                         }
-                    )
+                        if (!isReasoningCollapsed) {
+                            MarkdownText(
+                                markdown = streamResult.reasoning,
+                                modifier = Modifier.fillMaxWidth(),
+                                style = markdownStyle,
+                                onLinkClicked = { _ -> }
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+                    // Content部分
+                    if (streamResult.content.isNotBlank()) {
+                        Text(
+                            "分析内容",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        MarkdownText(
+                            markdown = streamResult.content,
+                            modifier = Modifier.fillMaxWidth(),
+                            style = markdownStyle,
+                            onLinkClicked = { _ -> }
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -252,8 +287,8 @@ fun NewsAnalysisScreen(navController: NavController) {
             }
         }
         
-        // 当加载完成但没有analysisResult时显示已完成状态
-        if (!isLoading && analysisResult == null && streamResult.isNotEmpty()) {
+        // 当加载完成但没有analysisResult时显示已完成状态（分区显示）
+        if (!isLoading && analysisResult == null && (streamResult.reasoning.isNotBlank() || streamResult.content.isNotBlank())) {
             Card(
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -264,15 +299,43 @@ fun NewsAnalysisScreen(navController: NavController) {
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    // 改进Markdown渲染样式，增强对粗体、标题等的支持
-                    MarkdownText(
-                        markdown = streamResult,
-                        modifier = Modifier.fillMaxWidth(),
-                        style = markdownStyle,
-                        onLinkClicked = { _ -> 
-                            // 可选：处理链接点击事件
+                    // Reasoning部分（可折叠）
+                    if (streamResult.reasoning.isNotBlank()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "推理过程",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            TextButton(onClick = { isReasoningCollapsed = !isReasoningCollapsed }) {
+                                Text(if (isReasoningCollapsed) "展开" else "折叠")
+                            }
                         }
-                    )
+                        if (!isReasoningCollapsed) {
+                            MarkdownText(
+                                markdown = streamResult.reasoning,
+                                modifier = Modifier.fillMaxWidth(),
+                                style = markdownStyle,
+                                onLinkClicked = { _ -> }
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+                    // Content部分
+                    if (streamResult.content.isNotBlank()) {
+                        Text(
+                            "分析内容",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        MarkdownText(
+                            markdown = streamResult.content,
+                            modifier = Modifier.fillMaxWidth(),
+                            style = markdownStyle,
+                            onLinkClicked = { _ -> }
+                        )
+                    }
                 }
             }
         }

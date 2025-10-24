@@ -76,17 +76,18 @@ class NewsAnalysisService {
 
                     when (type) {
                         "content" -> {
+                            // 兼容后端字段名，reasoning_content 可能为 reasoning
                             val reasoning = jsonObject.get("reasoning_content")?.asString
-                            val content = jsonObject.get("content")?.asString
-                            // 输出结构化JSON字符串，便于前端区分
+                                ?: jsonObject.get("reasoning")?.asString ?: ""
+                            val content = jsonObject.get("content")?.asString ?: ""
+                            // 输出结构化JSON字符串，保证字段为字符串且不为 null
                             val resultJson = buildString {
                                 append("{")
-                                append("\"reasoning\":")
-                                append(if (reasoning != null) "\"${reasoning.replace("\"", "\\\"")}\"" else "null")
-                                append(",")
-                                append("\"content\":")
-                                append(if (content != null) "\"${content.replace("\"", "\\\"")}\"" else "null")
-                                append("}")
+                                append("\"reasoning\":\"")
+                                append(reasoning.replace("\"", "\\\""))
+                                append("\",\"content\":\"")
+                                append(content.replace("\"", "\\\""))
+                                append("\"}")
                             }
                             trySend(resultJson)
                         }
