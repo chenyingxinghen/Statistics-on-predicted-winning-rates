@@ -87,10 +87,34 @@ class NewsAnalysisViewModel : ViewModel() {
 
                 // 只有在没有错误的情况下才设置最终结果
                 if (_errorMessage.value == null) {
-                    _analysisResult.value = NewsAnalysisResult(
-                        prediction = _streamResult.value.content,
-                        success = true
-                    )
+                    // 尝试从流式内容中解析 summary、industryAnalysis、marketTrend 等字段
+                    // 假设后端流式 content 最终为完整 JSON，可根据实际后端格式调整
+                    val content = _streamResult.value.content.trim()
+                    val result = if (content.startsWith("{") && content.endsWith("}")) {
+                        try {
+                            val json = JsonParser.parseString(content).asJsonObject
+                            NewsAnalysisResult(
+                                prediction = json["prediction"]?.asString ?: json["content"]?.asString ?: content,
+
+                                success = json["success"]?.asBoolean ?: true,
+                                message = json["message"]?.asString
+                            )
+                        } catch (e: Exception) {
+                            NewsAnalysisResult(
+                                prediction = content,
+                                success = true
+                            )
+                        }
+                    } else {
+                        // 如果内容不是JSON格式，创建一个默认的成功结果
+                        NewsAnalysisResult(
+                            prediction = content,
+                            success = true
+                        )
+                    }
+                    _analysisResult.value = result
+                    // 不再清空流式内容，保持显示直到用户查看完毕
+                    // _streamResult.value = StreamAnalysisState()
                 }
             } catch (e: Exception) {
                 Log.e("NewsAnalysisViewModel", "Error getting stream analysis", e)

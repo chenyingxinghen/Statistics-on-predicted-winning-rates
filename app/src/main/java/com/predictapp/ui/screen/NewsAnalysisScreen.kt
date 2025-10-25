@@ -79,6 +79,8 @@ fun NewsAnalysisScreen(navController: NavController) {
         Button(
             onClick = {
                 viewModel.getNewsAnalysisStream()
+                // 开始新的分析时，重置折叠状态
+                isReasoningCollapsed = false
             },
             modifier = Modifier.fillMaxWidth(),
             enabled = !isLoading
@@ -118,7 +120,7 @@ fun NewsAnalysisScreen(navController: NavController) {
         }
 
         // 实时显示流式结果（分区显示reasoning和content）
-        if (isLoading && (streamResult.reasoning.isNotBlank() || streamResult.content.isNotBlank())) {
+        if (isLoading && analysisResult == null && (streamResult.reasoning.isNotBlank() || streamResult.content.isNotBlank())) {
             Card(
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -142,6 +144,62 @@ fun NewsAnalysisScreen(navController: NavController) {
                                 Text(if (isReasoningCollapsed) "展开" else "折叠")
                             }
                         }
+                        // 流式输出时默认展开
+                        if (!isReasoningCollapsed) {
+                            MarkdownText(
+                                markdown = streamResult.reasoning,
+                                modifier = Modifier.fillMaxWidth(),
+                                style = markdownStyle,
+                                onLinkClicked = { _ -> }
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+                    // Content部分
+                    if (streamResult.content.isNotBlank()) {
+                        Text(
+                            "分析内容",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        MarkdownText(
+                            markdown = streamResult.content,
+                            modifier = Modifier.fillMaxWidth(),
+                            style = markdownStyle,
+                            onLinkClicked = { _ -> }
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        
+        // 当加载完成但没有analysisResult时显示已完成状态（分区显示）
+        if (!isLoading && analysisResult == null && (streamResult.reasoning.isNotBlank() || streamResult.content.isNotBlank())) {
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "分析已完成",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // Reasoning部分（可折叠）
+                    if (streamResult.reasoning.isNotBlank()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "推理过程",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            TextButton(onClick = { isReasoningCollapsed = !isReasoningCollapsed }) {
+                                Text(if (isReasoningCollapsed) "展开" else "折叠")
+                            }
+                        }
+                        // 加载完成后默认折叠，但用户可以手动展开
                         if (!isReasoningCollapsed) {
                             MarkdownText(
                                 markdown = streamResult.reasoning,
@@ -174,94 +232,22 @@ fun NewsAnalysisScreen(navController: NavController) {
         // 显示最终分析结果
         analysisResult?.let { result ->
             if (result.success) {
-                // 摘要部分
-                if (result.summary.isNotEmpty()) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                "摘要",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            MarkdownText(
-                                markdown = result.summary,
-                                modifier = Modifier.fillMaxWidth(),
-                                style = markdownStyle,
-                                onLinkClicked = { _ -> }
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-                
-                // 行业分析部分
-                if (result.industryAnalysis.isNotEmpty()) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                "行业分析",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            MarkdownText(
-                                markdown = result.industryAnalysis,
-                                modifier = Modifier.fillMaxWidth(),
-                                style = markdownStyle,
-                                onLinkClicked = { _ -> }
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-                
-                // 市场趋势部分
-                if (result.marketTrend.isNotEmpty()) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                "市场趋势",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            MarkdownText(
-                                markdown = result.marketTrend,
-                                modifier = Modifier.fillMaxWidth(),
-                                style = markdownStyle,
-                                onLinkClicked = { _ -> }
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-                
-                // 预测结果（使用Markdown渲染）
+                // 仅展示 prediction 字段
                 Card(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            "详细分析",
+                            "分析结果",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        // 改进Markdown渲染样式，增强对粗体、标题等的支持
                         MarkdownText(
                             markdown = result.prediction,
                             modifier = Modifier.fillMaxWidth(),
                             style = markdownStyle,
-                            onLinkClicked = { _ -> 
-                                // 可选：处理链接点击事件
-                            }
+                            onLinkClicked = { _ -> }
                         )
                     }
                 }
@@ -281,59 +267,6 @@ fun NewsAnalysisScreen(navController: NavController) {
                         Text(
                             text = result.message ?: "未知错误",
                             color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
-                }
-            }
-        }
-        
-        // 当加载完成但没有analysisResult时显示已完成状态（分区显示）
-        if (!isLoading && analysisResult == null && (streamResult.reasoning.isNotBlank() || streamResult.content.isNotBlank())) {
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        "分析已完成",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    // Reasoning部分（可折叠）
-                    if (streamResult.reasoning.isNotBlank()) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "推理过程",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            TextButton(onClick = { isReasoningCollapsed = !isReasoningCollapsed }) {
-                                Text(if (isReasoningCollapsed) "展开" else "折叠")
-                            }
-                        }
-                        if (!isReasoningCollapsed) {
-                            MarkdownText(
-                                markdown = streamResult.reasoning,
-                                modifier = Modifier.fillMaxWidth(),
-                                style = markdownStyle,
-                                onLinkClicked = { _ -> }
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-                    }
-                    // Content部分
-                    if (streamResult.content.isNotBlank()) {
-                        Text(
-                            "分析内容",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        MarkdownText(
-                            markdown = streamResult.content,
-                            modifier = Modifier.fillMaxWidth(),
-                            style = markdownStyle,
-                            onLinkClicked = { _ -> }
                         )
                     }
                 }
